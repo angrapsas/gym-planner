@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { BarChart3, Calendar, Dumbbell, Goal, Home, ListTodo, Timer } from "lucide-react"
+import { BarChart3, Calendar, Dumbbell, Goal, Home, ListTodo, Timer, Zap } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -41,7 +41,7 @@ export function AppSidebar() {
     },
     {
       title: "Skills",
-      icon: Dumbbell,
+      icon: Zap,
       href: "/skills",
     },
     {

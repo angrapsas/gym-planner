@@ -6,25 +6,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Slider } from "@/components/ui/slider"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
 
-// Sample skills data
-const allSkills = [
-  "Front Handspring",
-  "Back Handspring",
-  "Round-off",
-  "Cartwheel",
-  "Back Walkover",
-  "Front Walkover",
-  "Aerial",
-  "Back Tuck",
-  "Front Tuck",
-  "Layout",
-  "Full Twist",
-  "Double Full",
+// Sample routines data (this would come from the routines tab)
+const availableRoutines = [
+  { id: "routine-1", name: "Competition Routine", type: "Routine" },
+  { id: "routine-2", name: "Practice Routine", type: "Routine" },
+  { id: "routine-3", name: "Warm-up Routine", type: "Routine" },
+]
+
+// Sample conditioning data (this would come from the conditioning tab)
+const availableConditioning = [
+  { id: "cond-1", name: "Beach Abs", type: "Conditioning" },
+  { id: "cond-2", name: "Upper Body", type: "Conditioning" },
+  { id: "cond-3", name: "Lower Body", type: "Conditioning" },
+  { id: "cond-4", name: "Cardio", type: "Conditioning" },
+  { id: "cond-5", name: "Flexibility", type: "Conditioning" },
 ]
 
 interface DailyLogPanelProps {
@@ -32,19 +31,23 @@ interface DailyLogPanelProps {
 }
 
 export function DailyLogPanel({ date }: DailyLogPanelProps) {
-  const [practiceType, setPracticeType] = useState("Routine")
-  const [skillsCount, setSkillsCount] = useState("10")
-  const [sequencesCount, setSequencesCount] = useState("5")
-  const [routinesCount, setRoutinesCount] = useState("8")
-  const [hitRate, setHitRate] = useState(75)
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
+  const [selectedRoutines, setSelectedRoutines] = useState<string[]>([])
+  const [selectedConditioning, setSelectedConditioning] = useState<string[]>([])
   const [notes, setNotes] = useState("")
 
-  const handleSkillToggle = (skill: string) => {
-    if (selectedSkills.includes(skill)) {
-      setSelectedSkills(selectedSkills.filter((s) => s !== skill))
+  const handleRoutineToggle = (routineId: string) => {
+    if (selectedRoutines.includes(routineId)) {
+      setSelectedRoutines(selectedRoutines.filter((id) => id !== routineId))
     } else {
-      setSelectedSkills([...selectedSkills, skill])
+      setSelectedRoutines([...selectedRoutines, routineId])
+    }
+  }
+
+  const handleConditioningToggle = (conditioningId: string) => {
+    if (selectedConditioning.includes(conditioningId)) {
+      setSelectedConditioning(selectedConditioning.filter((id) => id !== conditioningId))
+    } else {
+      setSelectedConditioning([...selectedConditioning, conditioningId])
     }
   }
 
@@ -52,95 +55,67 @@ export function DailyLogPanel({ date }: DailyLogPanelProps) {
     // In a real app, this would save to a database
     console.log({
       date,
-      practiceType,
-      skillsCount,
-      sequencesCount,
-      routinesCount,
-      hitRate,
-      selectedSkills,
+      selectedRoutines,
+      selectedConditioning,
       notes,
     })
-    alert("Training log saved!")
+    alert("Day schedule saved!")
   }
 
   return (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
-        <Label htmlFor="practice-type">Practice Type</Label>
-        <Select value={practiceType} onValueChange={setPracticeType}>
-          <SelectTrigger id="practice-type">
-            <SelectValue placeholder="Select practice type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Routine">Routine</SelectItem>
-            <SelectItem value="Skills">Skills</SelectItem>
-            <SelectItem value="Conditioning">Conditioning</SelectItem>
-            <SelectItem value="Recovery">Recovery</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="skills-count">Skills Practiced</Label>
-          <Input id="skills-count" type="number" value={skillsCount} onChange={(e) => setSkillsCount(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="sequences-count">Sequences Practiced</Label>
-          <Input
-            id="sequences-count"
-            type="number"
-            value={sequencesCount}
-            onChange={(e) => setSequencesCount(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="routines-count">Routines Attempted</Label>
-          <Input
-            id="routines-count"
-            type="number"
-            value={routinesCount}
-            onChange={(e) => setRoutinesCount(e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="hit-rate">Hit Rate (%)</Label>
-          <div className="pt-2">
-            <Slider
-              id="hit-rate"
-              min={0}
-              max={100}
-              step={1}
-              value={[hitRate]}
-              onValueChange={(value) => setHitRate(value[0])}
-            />
-            <div className="text-right text-sm mt-1">{hitRate}%</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Skills Worked On</Label>
+        <Label>Routines</Label>
         <Card>
           <CardHeader className="py-2 px-4">
-            <CardTitle className="text-sm font-medium">Selected Skills: {selectedSkills.length}</CardTitle>
+            <CardTitle className="text-sm font-medium">Select Routines: {selectedRoutines.length}</CardTitle>
           </CardHeader>
           <CardContent className="px-4 py-2">
             <ScrollArea className="h-[120px]">
               <div className="space-y-2">
-                {allSkills.map((skill) => (
-                  <div key={skill} className="flex items-center space-x-2">
+                {availableRoutines.map((routine) => (
+                  <div key={routine.id} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`skill-${skill}`}
-                      checked={selectedSkills.includes(skill)}
-                      onCheckedChange={() => handleSkillToggle(skill)}
+                      id={`routine-${routine.id}`}
+                      checked={selectedRoutines.includes(routine.id)}
+                      onCheckedChange={() => handleRoutineToggle(routine.id)}
                     />
-                    <Label htmlFor={`skill-${skill}`} className="text-sm font-normal cursor-pointer">
-                      {skill}
+                    <Label htmlFor={`routine-${routine.id}`} className="text-sm font-normal cursor-pointer">
+                      {routine.name}
                     </Label>
+                    <Badge variant="outline" className="ml-auto text-xs">
+                      {routine.type}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Conditioning</Label>
+        <Card>
+          <CardHeader className="py-2 px-4">
+            <CardTitle className="text-sm font-medium">Select Conditioning: {selectedConditioning.length}</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 py-2">
+            <ScrollArea className="h-[120px]">
+              <div className="space-y-2">
+                {availableConditioning.map((conditioning) => (
+                  <div key={conditioning.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`conditioning-${conditioning.id}`}
+                      checked={selectedConditioning.includes(conditioning.id)}
+                      onCheckedChange={() => handleConditioningToggle(conditioning.id)}
+                    />
+                    <Label htmlFor={`conditioning-${conditioning.id}`} className="text-sm font-normal cursor-pointer">
+                      {conditioning.name}
+                    </Label>
+                    <Badge variant="outline" className="ml-auto text-xs">
+                      {conditioning.type}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -153,7 +128,7 @@ export function DailyLogPanel({ date }: DailyLogPanelProps) {
         <Label htmlFor="notes">Notes</Label>
         <Textarea
           id="notes"
-          placeholder="Add any notes about today's training..."
+          placeholder="Add any notes about this day's training..."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
@@ -161,7 +136,7 @@ export function DailyLogPanel({ date }: DailyLogPanelProps) {
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button onClick={handleSave}>Save Training Log</Button>
+        <Button onClick={handleSave}>Save Day Schedule</Button>
       </div>
     </div>
   )

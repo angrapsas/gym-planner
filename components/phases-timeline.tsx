@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Plus, Calendar, Edit, Trash2, Info } from "lucide-react"
+import { useGymData } from "@/context/GymDataContext"
+import { supabase } from "@/lib/supabase"
 
 // Sample phases data
 const initialPhases = [
@@ -56,7 +58,7 @@ const initialPhases = [
 ]
 
 export function PhasesTimeline() {
-  const [phases, setPhases] = useState(initialPhases)
+  const { phases, setPhases } = useGymData();
   const [newPhaseName, setNewPhaseName] = useState("")
   const [newPhaseType, setNewPhaseType] = useState("Build")
   const [isCreatingPhase, setIsCreatingPhase] = useState(false)
@@ -77,25 +79,46 @@ export function PhasesTimeline() {
     }
   }
 
-  const addNewPhase = () => {
+  const addNewPhase = async () => {
     if (!newPhaseName.trim() || !selectedStartDate) return
 
     const endDate = addDays(selectedStartDate, 14) // Default 2-week phase
 
-    const newPhase = {
-      id: `phase-${Date.now()}`,
-      name: newPhaseName,
-      type: newPhaseType,
-      startDate: selectedStartDate,
-      endDate: endDate,
-      color: getPhaseTypeColor(newPhaseType),
-    }
+    try {
+      const { data, error } = await supabase
+        .from("phases")
+        .insert({
+          name: newPhaseName,
+          phase_type: newPhaseType,
+          start_date: selectedStartDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          color: getPhaseTypeColor(newPhaseType),
+        })
+        .select()
+        .single()
 
-    setPhases([...phases, newPhase])
-    setNewPhaseName("")
-    setNewPhaseType("Build")
-    setSelectedStartDate(null)
-    setIsCreatingPhase(false)
+      if (error) {
+        console.error("Error adding phase:", error)
+        return
+      }
+
+      const newPhase = {
+        id: data.id,
+        name: data.name,
+        type: data.phase_type,
+        startDate: new Date(data.start_date),
+        endDate: new Date(data.end_date),
+        color: data.color,
+      }
+
+      setPhases([...phases, newPhase])
+      setNewPhaseName("")
+      setNewPhaseType("Build")
+      setSelectedStartDate(null)
+      setIsCreatingPhase(false)
+    } catch (error) {
+      console.error("Error adding phase:", error)
+    }
   }
 
   const deletePhase = (phaseId: string) => {

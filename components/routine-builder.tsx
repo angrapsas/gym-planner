@@ -10,6 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { useGymData } from "@/context/GymDataContext"
+import { supabase } from "@/lib/supabase"
 
 // Sample routines data
 const initialRoutines = [
@@ -61,12 +63,12 @@ const availableSkills = [
 ]
 
 export function RoutineBuilder() {
-  const [routines, setRoutines] = useState(initialRoutines)
-  const [activeRoutine, setActiveRoutine] = useState(routines[0].id)
-  const [newRoutineName, setNewRoutineName] = useState("")
-  const [newSkillName, setNewSkillName] = useState("")
-
-  const [autoScheduleDays, setAutoScheduleDays] = useState<{ [key: string]: string[] }>({})
+  const { routines = [], setRoutines } = useGymData();
+  const [activeRoutine, setActiveRoutine] = useState(routines[0]?.id || "");
+  const [newRoutineName, setNewRoutineName] = useState("");
+  const [newSkillName, setNewSkillName] = useState("");
+  const [newRoutineDate, setNewRoutineDate] = useState("");
+  const [autoScheduleDays, setAutoScheduleDays] = useState<{ [key: string]: string[] }>({});
 
   const daysOfWeek = [
     { id: "monday", label: "Monday" },
@@ -108,51 +110,96 @@ export function RoutineBuilder() {
     const currentRoutine = routines.find((r) => r.id === activeRoutine)
     if (!currentRoutine) return
 
-    const newSkills = Array.from(currentRoutine.skills)
+    const newSkills = Array.from(currentRoutine.skills ?? [])
     const [removed] = newSkills.splice(source.index, 1)
     newSkills.splice(destination.index, 0, removed)
 
     setRoutines(routines.map((routine) => (routine.id === activeRoutine ? { ...routine, skills: newSkills } : routine)))
   }
 
-  const addNewRoutine = () => {
+  const addNewRoutine = async () => {
     if (!newRoutineName.trim()) return
 
-    const newRoutine = {
-      id: `routine-${Date.now()}`,
-      name: newRoutineName,
-      isTarget: false,
-      skills: [],
-    }
+    try {
+      const routineData: any = {
+        name: newRoutineName,
+        skills: [],
+        created_at: new Date().toISOString()
+      };
+      
+      if (newRoutineDate) {
+        routineData.date = newRoutineDate;
+      }
+      
+      const { data, error } = await supabase
+        .from("routines")
+        .insert(routineData)
+        .select()
+        .single()
 
-    setRoutines([...routines, newRoutine])
-    setNewRoutineName("")
-    setActiveRoutine(newRoutine.id)
+      if (error) {
+        console.error("Error adding routine:", error)
+        return
+      }
+
+      const newRoutine = {
+        id: data.id,
+        name: data.name,
+        skills: data.skills || [],
+        isTarget: false,
+      }
+
+      setRoutines([...routines, newRoutine])
+      setNewRoutineName("")
+      setNewRoutineDate("")
+      setActiveRoutine(newRoutine.id)
+    } catch (error) {
+      console.error("Error adding routine:", error)
+    }
   }
 
-  const addNewSkill = () => {
+  const addNewSkill = async () => {
     if (!newSkillName.trim()) return
 
-    const newSkill = {
-      id: `skill-${Date.now()}`,
-      name: newSkillName,
-      readiness: "Not Started",
+    try {
+      const currentRoutine = routines.find((r) => r.id === activeRoutine)
+      if (!currentRoutine) return
+
+      const newSkill = {
+        id: `skill-${Date.now()}`,
+        name: newSkillName,
+        readiness: "Not Started",
+      }
+
+      const updatedSkills = [...(currentRoutine.skills ?? []), newSkill]
+
+      const { error } = await supabase
+        .from("routines")
+        .update({ skills: updatedSkills })
+        .eq("id", activeRoutine)
+
+      if (error) {
+        console.error("Error updating routine skills:", error)
+        return
+      }
+
+      setRoutines(
+        routines.map((routine) =>
+          routine.id === activeRoutine ? { ...routine, skills: updatedSkills } : routine,
+        ),
+      )
+
+      setNewSkillName("")
+    } catch (error) {
+      console.error("Error adding skill:", error)
     }
-
-    setRoutines(
-      routines.map((routine) =>
-        routine.id === activeRoutine ? { ...routine, skills: [...routine.skills, newSkill] } : routine,
-      ),
-    )
-
-    setNewSkillName("")
   }
 
   const removeSkill = (skillId: string) => {
     setRoutines(
       routines.map((routine) =>
         routine.id === activeRoutine
-          ? { ...routine, skills: routine.skills.filter((skill) => skill.id !== skillId) }
+          ? { ...routine, skills: (routine.skills ?? []).filter((skill) => skill.id !== skillId) }
           : routine,
       ),
     )
@@ -167,7 +214,7 @@ export function RoutineBuilder() {
     )
   }
 
-  const currentRoutine = routines.find((r) => r.id === activeRoutine)
+  const currentRoutine = routines.find((r) => r.id === activeRoutine);
 
   return (
     <div className="p-4 md:p-8 space-y-4">
@@ -196,7 +243,7 @@ export function RoutineBuilder() {
                       {routine.isTarget && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
                       <span>{routine.name}</span>
                     </div>
-                    <Badge variant="outline">{routine.skills.length} skills</Badge>
+                    <Badge variant="outline">{routine.skills?.length ?? 0} skills</Badge>
                   </div>
                 ))}
               </div>
@@ -212,6 +259,14 @@ export function RoutineBuilder() {
               <Button size="sm" onClick={addNewRoutine}>
                 <Plus className="h-4 w-4" />
               </Button>
+            </div>
+            <div className="flex w-full space-x-2">
+              <Input
+                type="date"
+                placeholder="Schedule date (optional)"
+                value={newRoutineDate}
+                onChange={(e) => setNewRoutineDate(e.target.value)}
+              />
             </div>
           </CardFooter>
         </Card>
@@ -276,7 +331,7 @@ export function RoutineBuilder() {
                 <Droppable droppableId="skills">
                   {(provided) => (
                     <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 min-h-[300px]">
-                      {currentRoutine.skills.map((skill, index) => (
+                      {(currentRoutine.skills ?? []).map((skill, index) => (
                         <Draggable key={skill.id} draggableId={skill.id} index={index}>
                           {(provided) => (
                             <div

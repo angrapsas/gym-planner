@@ -7,7 +7,8 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, CheckCircle, Clock, Dumbbell, AlertTriangle } from "lucide-react"
 import { DashboardChart } from "@/components/dashboard-chart"
-import { UpcomingEvents } from "@/components/upcoming-events"
+import { CalendarView } from "@/components/calendar-view"
+import { UpcomingEvents } from "./upcoming-events"
 
 export function DashboardView() {
   return (

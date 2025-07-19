@@ -1,6 +1,5 @@
-"use client"
-
-import { useState } from "react"
+"use client";
+import { useEffect, useState } from "react";
 import {
   format,
   addDays,
@@ -12,120 +11,148 @@ import {
   addMonths,
   subMonths,
   isWithinInterval,
-} from "date-fns"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DailyLogPanel } from "@/components/daily-log-panel"
-import { CalendarSidebar } from "@/components/calendar-sidebar"
-import { DragDropContext, type DropResult } from "@hello-pangea/dnd"
-
-// Sample data for calendar events
-const events = [
-  { date: new Date(2025, 6, 12), type: "Routine", phase: "Peak", name: "Competition Routine" },
-  { date: new Date(2025, 6, 14), type: "Skills", phase: "Peak", name: "Back Tuck" },
-  { date: new Date(2025, 6, 16), type: "Conditioning", phase: "Peak", name: "Beach Abs" },
-  { date: new Date(2025, 6, 18), type: "Routine", phase: "Peak", name: "Competition Routine" },
-  { date: new Date(2025, 6, 20), type: "Recovery", phase: "Recovery", name: "Recovery Session" },
-]
-
-// Sample phases data
-const phases = [
-  {
-    id: "phase-1",
-    name: "Build Phase",
-    type: "Build",
-    startDate: new Date(2025, 6, 1),
-    endDate: new Date(2025, 6, 20),
-    color: "bg-blue-500",
-  },
-  {
-    id: "phase-2",
-    name: "Peak Phase",
-    type: "Peak",
-    startDate: new Date(2025, 6, 21),
-    endDate: new Date(2025, 7, 10),
-    color: "bg-purple-500",
-  },
-]
+} from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DailyLogPanel } from "@/components/daily-log-panel";
+import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import { supabase } from "@/lib/supabase";
 
 export function CalendarView() {
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [isSheetOpen, setIsSheetOpen] = useState(false)
-  const [monthView, setMonthView] = useState<"1" | "2" | "3">("1")
-  const [calendarEvents, setCalendarEvents] = useState(events)
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [monthView, setMonthView] = useState<"1" | "2" | "3">("1");
+
+  // Live data from Supabase
+  const [routines, setRoutines] = useState<any[]>([]);
+  const [phases, setPhases] = useState<any[]>([]);
+  const [conditioning, setConditioning] = useState<any[]>([]);
+
+  // Fetch data from Supabase
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        console.log("Starting to fetch data from Supabase...");
+        
+        const { data: routinesData, error: routinesError } = await supabase.from("routines").select("*");
+        if (routinesError) {
+          console.error("Error fetching routines:", routinesError);
+        }
+        setRoutines(routinesData || []);
+
+        const { data: phasesData, error: phasesError } = await supabase.from("phases").select("*");
+        if (phasesError) {
+          console.error("Error fetching phases:", phasesError);
+        }
+        setPhases(phasesData || []);
+
+        const { data: conditioningData, error: conditioningError } = await supabase.from("conditioning").select("*");
+        if (conditioningError) {
+          console.error("Error fetching conditioning:", conditioningError);
+        }
+        setConditioning(conditioningData || []);
+        
+        // Debug log:
+        console.log("Routines:", routinesData);
+        console.log("Phases:", phasesData);
+        console.log("Conditioning:", conditioningData);
+        console.log("Fetch completed successfully");
+      } catch (error) {
+        console.error("Error in fetchData:", error);
+      }
+    }
+    fetchData();
+  }, []);
+
+  // Combine all events for the calendar
+  const calendarEvents = [
+    ...routines
+      .filter(r => r.date)
+      .map(r => ({
+        date: new Date(r.date + 'T00:00:00'), // Force local timezone
+        type: "Routine",
+        name: r.name,
+        skills: r.skills || [],
+      })),
+    ...conditioning
+      .filter(c => c.date)
+      .map(c => ({
+        date: new Date(c.date + 'T00:00:00'), // Force local timezone
+        type: "Conditioning",
+        name: c.name,
+        exercises: c.exercises || [],
+      })),
+    // Add more as needed (e.g., skills, recovery, etc.)
+  ];
+
+  // Debug: Log the processed events
+  console.log("Raw routines:", routines);
+  console.log("Raw conditioning:", conditioning);
+  console.log("Processed calendar events:", calendarEvents);
+  console.log("Events with dates:", calendarEvents.filter(e => e.date));
+
+  // Drag-and-drop handler (optional, can be removed if not needed)
+  const handleDragEnd = (result: DropResult) => {
+    // You can implement drag-to-schedule logic here if you want
+  };
 
   const handleDateClick = (date: Date) => {
-    setSelectedDate(date)
-    setIsSheetOpen(true)
-  }
-
-  const handleDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId } = result
-
-    if (!destination) return
-
-    // Parse the destination date from the droppableId
-    const destinationDate = new Date(destination.droppableId)
-
-    // Create new event based on dragged item
-    const newEvent = {
-      date: destinationDate,
-      type: source.droppableId.includes("routine")
-        ? "Routine"
-        : source.droppableId.includes("skill")
-          ? "Skills"
-          : source.droppableId.includes("conditioning")
-            ? "Conditioning"
-            : "Routine",
-      phase: "Peak", // This would be determined by the current phase
-      name: draggableId, // This would be the actual name from the dragged item
-    }
-
-    setCalendarEvents([...calendarEvents, newEvent])
-  }
+    setSelectedDate(date);
+    setIsSheetOpen(true);
+  };
 
   const renderMonth = (monthDate: Date, index: number) => {
-    const firstDayOfMonth = startOfMonth(monthDate)
-    const lastDayOfMonth = endOfMonth(monthDate)
-    const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth })
+    const firstDayOfMonth = startOfMonth(monthDate);
+    const lastDayOfMonth = endOfMonth(monthDate);
+    const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
 
     // Add days from previous month to start the calendar on Sunday
-    const startDay = firstDayOfMonth.getDay()
-    const daysFromPreviousMonth = Array.from({ length: startDay }, (_, i) => addDays(firstDayOfMonth, -startDay + i))
+    const startDay = firstDayOfMonth.getDay();
+    const daysFromPreviousMonth = Array.from({ length: startDay }, (_, i) => addDays(firstDayOfMonth, -startDay + i));
 
     // Add days from next month to complete the calendar grid
-    const endDay = 6 - lastDayOfMonth.getDay()
-    const daysFromNextMonth = Array.from({ length: endDay }, (_, i) => addDays(lastDayOfMonth, i + 1))
+    const endDay = 6 - lastDayOfMonth.getDay();
+    const daysFromNextMonth = Array.from({ length: endDay }, (_, i) => addDays(lastDayOfMonth, i + 1));
 
-    const allDays = [...daysFromPreviousMonth, ...daysInMonth, ...daysFromNextMonth]
+    const allDays = [...daysFromPreviousMonth, ...daysInMonth, ...daysFromNextMonth];
 
     const getEventForDate = (date: Date) => {
-      return calendarEvents.filter((event) => isSameDay(event.date, date))
-    }
+      const events = calendarEvents.filter((event) => isSameDay(event.date, date));
+      // Debug: Log events for specific dates (only for today and a few other dates to avoid spam)
+      if (isSameDay(date, new Date()) || date.getDate() <= 5) {
+        console.log(`Events for ${format(date, 'yyyy-MM-dd')}:`, events);
+      }
+      return events;
+    };
 
     const getPhaseForDate = (date: Date) => {
-      return phases.find((phase) => isWithinInterval(date, { start: phase.startDate, end: phase.endDate }))
-    }
+      return phases.find((phase) =>
+        isWithinInterval(date, { 
+          start: new Date(phase.start_date + 'T00:00:00'), 
+          end: new Date(phase.end_date + 'T00:00:00') 
+        })
+      );
+    };
 
     const getEventTypeColor = (type: string) => {
       switch (type) {
         case "Routine":
-          return "bg-purple-500"
+          return "bg-purple-500";
         case "Skills":
-          return "bg-blue-500"
+          return "bg-blue-500";
         case "Conditioning":
-          return "bg-red-500"
+          return "bg-red-500";
         case "Recovery":
-          return "bg-green-500"
+          return "bg-green-500";
         default:
-          return "bg-gray-500"
+          return "bg-gray-500";
       }
-    }
+    };
 
     return (
       <Card key={index} className="flex-1">
@@ -142,8 +169,8 @@ export function CalendarView() {
           </div>
           <div className="grid grid-cols-7">
             {allDays.map((day, i) => {
-              const dayEvents = getEventForDate(day)
-              const phase = getPhaseForDate(day)
+              const dayEvents = getEventForDate(day);
+              const phase = getPhaseForDate(day);
               return (
                 <div
                   key={i}
@@ -151,7 +178,7 @@ export function CalendarView() {
                     "border p-1 relative min-h-[80px]",
                     !isSameMonth(day, monthDate) && "text-muted-foreground bg-muted/50",
                     "hover:bg-muted cursor-pointer transition-colors",
-                    phase && `border-l-4 ${phase.color.replace("bg-", "border-l-")}`,
+                    phase && `border-l-4 ${phase.color?.replace("bg-", "border-l-")}`,
                   )}
                   onClick={() => handleDateClick(day)}
                   data-date={day.toISOString()}
@@ -172,29 +199,28 @@ export function CalendarView() {
                     )}
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </CardContent>
       </Card>
-    )
-  }
+    );
+  };
 
   const getMonthsToDisplay = () => {
-    const months = [currentMonth]
+    const months = [currentMonth];
     if (monthView === "2" || monthView === "3") {
-      months.push(addMonths(currentMonth, 1))
+      months.push(addMonths(currentMonth, 1));
     }
     if (monthView === "3") {
-      months.push(addMonths(currentMonth, 2))
+      months.push(addMonths(currentMonth, 2));
     }
-    return months
-  }
+    return months;
+  };
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex h-full">
-        <CalendarSidebar />
         <div className="flex-1 p-4 md:p-8 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-bold tracking-tight">Training Calendar</h2>
@@ -240,5 +266,5 @@ export function CalendarView() {
         </div>
       </div>
     </DragDropContext>
-  )
+  );
 }
