@@ -58,7 +58,14 @@ const initialPhases = [
 ]
 
 export function PhasesTimeline() {
-  const { phases, setPhases } = useGymData();
+  const { phases: contextPhases, setPhases } = useGymData();
+  
+  // Convert context phases to the format expected by this component
+  const phases = contextPhases.map(phase => ({
+    ...phase,
+    startDate: phase.startDate instanceof Date ? phase.startDate : new Date(phase.startDate),
+    endDate: phase.endDate instanceof Date ? phase.endDate : new Date(phase.endDate),
+  }));
   const [newPhaseName, setNewPhaseName] = useState("")
   const [newPhaseType, setNewPhaseType] = useState("Build")
   const [isCreatingPhase, setIsCreatingPhase] = useState(false)

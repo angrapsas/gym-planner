@@ -1,5 +1,6 @@
 "use client"
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
 
 // Types for routines, phases, and conditioning
 export interface Routine {
@@ -40,6 +41,59 @@ export const GymDataProvider = ({ children }: { children: ReactNode }) => {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [conditioning, setConditioning] = useState<Conditioning[]>([]);
+
+  // Load data from Supabase on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        // Load routines
+        const { data: routinesData, error: routinesError } = await supabase
+          .from("routines")
+          .select("*");
+        
+        if (routinesError) {
+          console.error("Error loading routines:", routinesError);
+        } else {
+          setRoutines(routinesData || []);
+        }
+
+        // Load phases
+        const { data: phasesData, error: phasesError } = await supabase
+          .from("phases")
+          .select("*");
+        
+        if (phasesError) {
+          console.error("Error loading phases:", phasesError);
+        } else {
+          // Convert Supabase data to the expected format
+          const formattedPhases = (phasesData || []).map(phase => ({
+            id: phase.id,
+            name: phase.name,
+            type: phase.phase_type,
+            startDate: new Date(phase.start_date),
+            endDate: new Date(phase.end_date),
+            color: phase.color,
+          }));
+          setPhases(formattedPhases);
+        }
+
+        // Load conditioning
+        const { data: conditioningData, error: conditioningError } = await supabase
+          .from("conditioning")
+          .select("*");
+        
+        if (conditioningError) {
+          console.error("Error loading conditioning:", conditioningError);
+        } else {
+          setConditioning(conditioningData || []);
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+      }
+    }
+
+    loadData();
+  }, []);
 
   return (
     <GymDataContext.Provider value={{ routines, setRoutines, phases, setPhases, conditioning, setConditioning }}>
