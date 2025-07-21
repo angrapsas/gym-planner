@@ -171,6 +171,11 @@ export function CalendarView() {
             {allDays.map((day, i) => {
               const dayEvents = getEventForDate(day);
               const phase = getPhaseForDate(day);
+              
+              // Determine if this is the first or last day of the phase for rounded corners
+              const isFirstDay = phase ? isSameDay(day, new Date(phase.start_date + 'T00:00:00')) : false;
+              const isLastDay = phase ? isSameDay(day, new Date(phase.end_date + 'T00:00:00')) : false;
+
               return (
                 <div
                   key={i}
@@ -178,14 +183,38 @@ export function CalendarView() {
                     "border p-1 relative min-h-[80px]",
                     !isSameMonth(day, monthDate) && "text-muted-foreground bg-muted/50",
                     "hover:bg-muted cursor-pointer transition-colors",
-                    phase && `border-l-4 ${phase.color?.replace("bg-", "border-l-")}`,
                   )}
                   onClick={() => handleDateClick(day)}
                   data-date={day.toISOString()}
                 >
                   <div className="text-right p-1 text-xs">{format(day, "d")}</div>
-                  {phase && <div className="absolute top-1 left-1 text-xs text-muted-foreground">{phase.name}</div>}
-                  <div className="space-y-1 mt-4">
+                  
+                  {/* Phase Bar */}
+                  {phase && (
+                    <div 
+                      className={cn(
+                        "absolute top-6 left-0 right-0 h-4 text-white text-xs font-medium flex items-center px-1",
+                        phase.color || "bg-blue-500",
+                        isFirstDay && "rounded-l-sm",
+                        isLastDay && "rounded-r-sm",
+                        !isFirstDay && "ml-0",
+                        !isLastDay && "mr-0"
+                      )}
+                      style={{
+                        // Ensure the bar extends to the edges for seamless connection
+                        marginLeft: isFirstDay ? 0 : -1,
+                        marginRight: isLastDay ? 0 : -1,
+                        zIndex: 10
+                      }}
+                    >
+                      {/* Only show phase name on the first day to avoid repetition */}
+                      {isFirstDay && (
+                        <span className="truncate">{phase.name}</span>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="space-y-1 mt-12">
                     {dayEvents.slice(0, 2).map((event, idx) => (
                       <div
                         key={idx}
