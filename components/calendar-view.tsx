@@ -33,6 +33,7 @@ export function CalendarView() {
   const [phases, setPhases] = useState<any[]>([]);
   const [conditioning, setConditioning] = useState<any[]>([]);
   const [phaseRoutines, setPhaseRoutines] = useState<any[]>([]);
+  const [phaseConditionings, setPhaseConditionings] = useState<any[]>([]);
 
   // Fetch data from Supabase
   useEffect(() => {
@@ -64,11 +65,18 @@ export function CalendarView() {
         }
         setPhaseRoutines(phaseRoutinesData || []);
         
+        const { data: phaseConditioningsData, error: phaseConditioningsError } = await supabase.from("phase_conditionings").select("*");
+        if (phaseConditioningsError) {
+          console.error("Error fetching phase_conditionings:", phaseConditioningsError);
+        }
+        setPhaseConditionings(phaseConditioningsData || []);
+        
         // Debug log:
         console.log("Routines:", routinesData);
         console.log("Phases:", phasesData);
         console.log("Conditioning:", conditioningData);
         console.log("Phase Routines:", phaseRoutinesData);
+        console.log("Phase Conditionings:", phaseConditioningsData);
         console.log("Fetch completed successfully");
       } catch (error) {
         console.error("Error in fetchData:", error);
@@ -88,7 +96,7 @@ export function CalendarView() {
         name: r.name,
         skills: r.skills || [],
       })),
-    // Conditioning
+    // Conditioning with a specific date
     ...conditioning
       .filter(c => c.date)
       .map(c => ({
@@ -125,6 +133,34 @@ export function CalendarView() {
         return days;
       });
     }),
+    // Conditioning assigned to phases by weekday
+    ...phases.flatMap(phase => {
+      const phaseStart = new Date(phase.start_date + 'T00:00:00');
+      const phaseEnd = new Date(phase.end_date + 'T00:00:00');
+      // Find all phase_conditionings for this phase
+      const phaseConditioningLinks = phaseConditionings.filter(pc => pc.phase_id === phase.id);
+      // For each conditioning link, generate events for each matching weekday in the phase range
+      return phaseConditioningLinks.flatMap(pc => {
+        const cond = conditioning.find(c => c.id === pc.conditioning_id);
+        if (!cond) return [];
+        // For each day in the phase, if it matches a selected weekday, create an event
+        const days = [];
+        for (let d = new Date(phaseStart); d <= phaseEnd; d.setDate(d.getDate() + 1)) {
+          const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+          if (pc.days_of_week.includes(dayName)) {
+            days.push({
+              date: new Date(d),
+              type: "Conditioning",
+              name: cond.name,
+              exercises: cond.exercises || [],
+              phaseName: phase.name,
+              phaseColor: phase.color,
+            });
+          }
+        }
+        return days;
+      });
+    }),
   ];
 
   // Debug: Log the processed events
@@ -132,6 +168,7 @@ export function CalendarView() {
   console.log("Raw conditioning:", conditioning);
   console.log("Raw phases:", phases);
   console.log("Raw phase_routines:", phaseRoutines);
+  console.log("Raw phase_conditionings:", phaseConditionings);
   console.log("Processed calendar events:", calendarEvents);
   console.log("Events with dates:", calendarEvents.filter(e => e.date));
 

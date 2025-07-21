@@ -77,11 +77,17 @@ export function PhasesTimeline() {
   const [newStartDate, setNewStartDate] = useState<Date | null>(null)
   const [newEndDate, setNewEndDate] = useState<Date | null>(null)
   const [routines, setRoutines] = useState<any[]>([]);
+  const [conditionings, setConditionings] = useState<any[]>([]);
   // Routine assignment state
   const [routineAssignments, setRoutineAssignments] = useState<{
     [routineId: string]: string[]; // days of week
   }>({});
   const [selectedRoutines, setSelectedRoutines] = useState<string[]>([]);
+  // Conditioning assignment state
+  const [conditioningAssignments, setConditioningAssignments] = useState<{
+    [conditioningId: string]: string[];
+  }>({});
+  const [selectedConditionings, setSelectedConditionings] = useState<string[]>([]);
   const daysOfWeek = [
     "Monday",
     "Tuesday",
@@ -97,7 +103,12 @@ export function PhasesTimeline() {
       const { data, error } = await supabase.from("routines").select("*");
       if (!error) setRoutines(data || []);
     }
+    async function fetchConditionings() {
+      const { data, error } = await supabase.from("conditioning").select("*");
+      if (!error) setConditionings(data || []);
+    }
     fetchRoutines();
+    fetchConditionings();
   }, []);
 
   const getPhaseTypeColor = (type: string) => {
@@ -151,7 +162,23 @@ export function PhasesTimeline() {
           }
         }
       }
-      // 3. Reset state
+      // 3. Insert phase_conditionings for each selected conditioning
+      for (const conditioningId of selectedConditionings) {
+        const days = conditioningAssignments[conditioningId] || [];
+        if (days.length > 0) {
+          const { error: pcError } = await supabase
+            .from("phase_conditionings")
+            .insert({
+              phase_id: phaseData.id,
+              conditioning_id: conditioningId,
+              days_of_week: days,
+            });
+          if (pcError) {
+            console.error("Error adding phase_conditioning:", pcError);
+          }
+        }
+      }
+      // 4. Reset state
       setPhases([...phases, {
         ...phaseData,
         startDate: new Date(phaseData.start_date),
@@ -163,6 +190,8 @@ export function PhasesTimeline() {
       setNewEndDate(null);
       setRoutineAssignments({});
       setSelectedRoutines([]);
+      setConditioningAssignments({});
+      setSelectedConditionings([]);
     } catch (error) {
       console.error("Error adding phase:", error);
     }
@@ -402,6 +431,62 @@ export function PhasesTimeline() {
                               }}
                             />
                             <Label htmlFor={`routine-${routine.id}-day-${day}`}>{day.slice(0, 3)}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </ScrollArea>
+            </div>
+            {/* Assign Conditioning Section */}
+            <div className="space-y-2">
+              <Label>Assign Conditioning</Label>
+              <ScrollArea className="h-48 border rounded-md p-2">
+                {conditionings.length === 0 && <div className="text-sm text-muted-foreground">No conditioning found.</div>}
+                {conditionings.map((conditioning) => (
+                  <div key={conditioning.id} className="mb-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`conditioning-${conditioning.id}`}
+                        checked={selectedConditionings.includes(conditioning.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedConditionings((prev) =>
+                            checked
+                              ? [...prev, conditioning.id]
+                              : prev.filter((id) => id !== conditioning.id)
+                          );
+                          if (!checked) {
+                            setConditioningAssignments((prev) => {
+                              const copy = { ...prev };
+                              delete copy[conditioning.id];
+                              return copy;
+                            });
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`conditioning-${conditioning.id}`}>{conditioning.name}</Label>
+                    </div>
+                    {selectedConditionings.includes(conditioning.id) && (
+                      <div className="flex flex-wrap gap-2 ml-6 mt-1">
+                        {daysOfWeek.map((day) => (
+                          <div key={day} className="flex items-center gap-1">
+                            <Checkbox
+                              id={`conditioning-${conditioning.id}-day-${day}`}
+                              checked={conditioningAssignments[conditioning.id]?.includes(day) || false}
+                              onCheckedChange={(checked) => {
+                                setConditioningAssignments((prev) => {
+                                  const prevDays = prev[conditioning.id] || [];
+                                  return {
+                                    ...prev,
+                                    [conditioning.id]: checked
+                                      ? [...prevDays, day]
+                                      : prevDays.filter((d) => d !== day),
+                                  };
+                                });
+                              }}
+                            />
+                            <Label htmlFor={`conditioning-${conditioning.id}-day-${day}`}>{day.slice(0, 3)}</Label>
                           </div>
                         ))}
                       </div>
