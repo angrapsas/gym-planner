@@ -9,9 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Calendar, Edit, Trash2, Info } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Plus, Calendar as CalendarIcon, Trash2, Info } from "lucide-react"
 import { useGymData } from "@/context/GymDataContext"
 import { supabase } from "@/lib/supabase"
+import { cn } from "@/lib/utils"
 
 // Sample phases data
 const initialPhases = [
@@ -66,10 +69,11 @@ export function PhasesTimeline() {
     startDate: phase.startDate instanceof Date ? phase.startDate : new Date(phase.startDate),
     endDate: phase.endDate instanceof Date ? phase.endDate : new Date(phase.endDate),
   }));
+  
   const [newPhaseName, setNewPhaseName] = useState("")
   const [newPhaseType, setNewPhaseType] = useState("Build")
-  const [isCreatingPhase, setIsCreatingPhase] = useState(false)
-  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null)
+  const [newStartDate, setNewStartDate] = useState<Date | null>(null)
+  const [newEndDate, setNewEndDate] = useState<Date | null>(null)
 
   const getPhaseTypeColor = (type: string) => {
     switch (type) {
@@ -87,9 +91,10 @@ export function PhasesTimeline() {
   }
 
   const addNewPhase = async () => {
-    if (!newPhaseName.trim() || !selectedStartDate) return
-
-    const endDate = addDays(selectedStartDate, 14) // Default 2-week phase
+    if (!newPhaseName.trim() || !newStartDate || !newEndDate) {
+      console.log("Validation failed - missing required fields")
+      return
+    }
 
     try {
       const { data, error } = await supabase
@@ -97,8 +102,8 @@ export function PhasesTimeline() {
         .insert({
           name: newPhaseName,
           phase_type: newPhaseType,
-          start_date: selectedStartDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
+          start_date: newStartDate.toISOString().split('T')[0],
+          end_date: newEndDate.toISOString().split('T')[0],
           color: getPhaseTypeColor(newPhaseType),
         })
         .select()
@@ -121,15 +126,29 @@ export function PhasesTimeline() {
       setPhases([...phases, newPhase])
       setNewPhaseName("")
       setNewPhaseType("Build")
-      setSelectedStartDate(null)
-      setIsCreatingPhase(false)
+      setNewStartDate(null)
+      setNewEndDate(null)
     } catch (error) {
       console.error("Error adding phase:", error)
     }
   }
 
-  const deletePhase = (phaseId: string) => {
-    setPhases(phases.filter((phase) => phase.id !== phaseId))
+  const deletePhase = async (phaseId: string) => {
+    try {
+      const { error } = await supabase
+        .from("phases")
+        .delete()
+        .eq("id", phaseId)
+
+      if (error) {
+        console.error("Error deleting phase:", error)
+        return
+      }
+
+      setPhases(phases.filter((phase) => phase.id !== phaseId))
+    } catch (error) {
+      console.error("Error deleting phase:", error)
+    }
   }
 
   const today = new Date()
@@ -147,8 +166,7 @@ export function PhasesTimeline() {
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Create phases here, then use the Calendar view to drag phase blocks across date ranges by clicking start and
-          end dates.
+          Create phases here with specific start and end dates. Phases will appear as colored bars in the Calendar view.
         </AlertDescription>
       </Alert>
 
@@ -184,7 +202,7 @@ export function PhasesTimeline() {
                         <CardContent className="py-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                               <span>
                                 {format(phase.startDate, "MMM d, yyyy")} - {format(phase.endDate, "MMM d, yyyy")}
                               </span>
@@ -196,9 +214,6 @@ export function PhasesTimeline() {
                               </Badge>
                             </div>
                             <div className="flex space-x-1">
-                              <Button variant="ghost" size="icon">
-                                <Edit className="h-4 w-4" />
-                              </Button>
                               <Button variant="ghost" size="icon" onClick={() => deletePhase(phase.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -218,7 +233,7 @@ export function PhasesTimeline() {
         <CardHeader>
           <CardTitle>Create New Phase</CardTitle>
           <CardDescription>
-            Create phase templates here. Use the Calendar view to drag and stretch phases across specific date ranges.
+            Create a new training phase with specific start and end dates.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -248,19 +263,77 @@ export function PhasesTimeline() {
                 </Select>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !newStartDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newStartDate ? format(newStartDate, "PPP") : <span>Pick start date</span>}
+                      {newStartDate && <span className="ml-2 text-xs text-green-600">✓</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={newStartDate || undefined}
+                      onSelect={(date) => {
+                        console.log("Start date selected:", date)
+                        setNewStartDate(date || null)
+                      }}
+                      initialFocus
+                      disabled={(date) => date < new Date("1900-01-01")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !newEndDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newEndDate ? format(newEndDate, "PPP") : <span>Pick end date</span>}
+                      {newEndDate && <span className="ml-2 text-xs text-green-600">✓</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={newEndDate || undefined}
+                      onSelect={(date) => {
+                        console.log("End date selected:", date)
+                        setNewEndDate(date || null)
+                      }}
+                      initialFocus
+                      disabled={(date) => date < new Date("1900-01-01")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </div>
         </CardContent>
         <CardFooter>
           <Button
-            onClick={() => {
-              if (newPhaseName.trim()) {
-                setSelectedStartDate(new Date())
-                addNewPhase()
-              }
-            }}
+            onClick={addNewPhase}
+            disabled={!newPhaseName.trim() || !newStartDate || !newEndDate}
           >
             <Plus className="h-4 w-4 mr-2" />
-            Create Phase Template
+            Create Phase
           </Button>
         </CardFooter>
       </Card>
