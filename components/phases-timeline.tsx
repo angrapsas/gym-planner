@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format, addDays, isWithinInterval } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +15,8 @@ import { Plus, Calendar as CalendarIcon, Trash2, Info } from "lucide-react"
 import { useGymData } from "@/context/GymDataContext"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Sample phases data
 const initialPhases = [
@@ -74,6 +76,29 @@ export function PhasesTimeline() {
   const [newPhaseType, setNewPhaseType] = useState("Build")
   const [newStartDate, setNewStartDate] = useState<Date | null>(null)
   const [newEndDate, setNewEndDate] = useState<Date | null>(null)
+  const [routines, setRoutines] = useState<any[]>([]);
+  // Routine assignment state
+  const [routineAssignments, setRoutineAssignments] = useState<{
+    [routineId: string]: string[]; // days of week
+  }>({});
+  const [selectedRoutines, setSelectedRoutines] = useState<string[]>([]);
+  const daysOfWeek = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+
+  useEffect(() => {
+    async function fetchRoutines() {
+      const { data, error } = await supabase.from("routines").select("*");
+      if (!error) setRoutines(data || []);
+    }
+    fetchRoutines();
+  }, []);
 
   const getPhaseTypeColor = (type: string) => {
     switch (type) {
@@ -90,48 +115,58 @@ export function PhasesTimeline() {
     }
   }
 
+  // Enhanced phase creation logic
   const addNewPhase = async () => {
-    if (!newPhaseName.trim() || !newStartDate || !newEndDate) {
-      console.log("Validation failed - missing required fields")
-      return
-    }
-
+    if (!newPhaseName.trim() || !newStartDate || !newEndDate) return;
     try {
-      const { data, error } = await supabase
+      // 1. Insert phase
+      const { data: phaseData, error: phaseError } = await supabase
         .from("phases")
         .insert({
           name: newPhaseName,
           phase_type: newPhaseType,
-          start_date: newStartDate.toISOString().split('T')[0],
-          end_date: newEndDate.toISOString().split('T')[0],
+          start_date: newStartDate.toISOString().split("T")[0],
+          end_date: newEndDate.toISOString().split("T")[0],
           color: getPhaseTypeColor(newPhaseType),
         })
         .select()
-        .single()
-
-      if (error) {
-        console.error("Error adding phase:", error)
-        return
+        .single();
+      if (phaseError) {
+        console.error("Error adding phase:", phaseError);
+        return;
       }
-
-      const newPhase = {
-        id: data.id,
-        name: data.name,
-        type: data.phase_type,
-        startDate: new Date(data.start_date),
-        endDate: new Date(data.end_date),
-        color: data.color,
+      // 2. Insert phase_routines for each selected routine
+      for (const routineId of selectedRoutines) {
+        const days = routineAssignments[routineId] || [];
+        if (days.length > 0) {
+          const { error: prError } = await supabase
+            .from("phase_routines")
+            .insert({
+              phase_id: phaseData.id,
+              routine_id: routineId,
+              days_of_week: days,
+            });
+          if (prError) {
+            console.error("Error adding phase_routine:", prError);
+          }
+        }
       }
-
-      setPhases([...phases, newPhase])
-      setNewPhaseName("")
-      setNewPhaseType("Build")
-      setNewStartDate(null)
-      setNewEndDate(null)
+      // 3. Reset state
+      setPhases([...phases, {
+        ...phaseData,
+        startDate: new Date(phaseData.start_date),
+        endDate: new Date(phaseData.end_date),
+      }]);
+      setNewPhaseName("");
+      setNewPhaseType("Build");
+      setNewStartDate(null);
+      setNewEndDate(null);
+      setRoutineAssignments({});
+      setSelectedRoutines([]);
     } catch (error) {
-      console.error("Error adding phase:", error)
+      console.error("Error adding phase:", error);
     }
-  }
+  };
 
   const deletePhase = async (phaseId: string) => {
     try {
@@ -284,10 +319,7 @@ export function PhasesTimeline() {
                     <Calendar
                       mode="single"
                       selected={newStartDate || undefined}
-                      onSelect={(date) => {
-                        console.log("Start date selected:", date)
-                        setNewStartDate(date || null)
-                      }}
+                      onSelect={(date) => setNewStartDate(date || null)}
                       initialFocus
                       disabled={(date) => date < new Date("1900-01-01")}
                     />
@@ -314,16 +346,69 @@ export function PhasesTimeline() {
                     <Calendar
                       mode="single"
                       selected={newEndDate || undefined}
-                      onSelect={(date) => {
-                        console.log("End date selected:", date)
-                        setNewEndDate(date || null)
-                      }}
+                      onSelect={(date) => setNewEndDate(date || null)}
                       initialFocus
                       disabled={(date) => date < new Date("1900-01-01")}
                     />
                   </PopoverContent>
                 </Popover>
               </div>
+            </div>
+            {/* Assign Routines Section */}
+            <div className="space-y-2">
+              <Label>Assign Routines</Label>
+              <ScrollArea className="h-48 border rounded-md p-2">
+                {routines.length === 0 && <div className="text-sm text-muted-foreground">No routines found.</div>}
+                {routines.map((routine) => (
+                  <div key={routine.id} className="mb-2">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`routine-${routine.id}`}
+                        checked={selectedRoutines.includes(routine.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedRoutines((prev) =>
+                            checked
+                              ? [...prev, routine.id]
+                              : prev.filter((id) => id !== routine.id)
+                          );
+                          if (!checked) {
+                            setRoutineAssignments((prev) => {
+                              const copy = { ...prev };
+                              delete copy[routine.id];
+                              return copy;
+                            });
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`routine-${routine.id}`}>{routine.name}</Label>
+                    </div>
+                    {selectedRoutines.includes(routine.id) && (
+                      <div className="flex flex-wrap gap-2 ml-6 mt-1">
+                        {daysOfWeek.map((day) => (
+                          <div key={day} className="flex items-center gap-1">
+                            <Checkbox
+                              id={`routine-${routine.id}-day-${day}`}
+                              checked={routineAssignments[routine.id]?.includes(day) || false}
+                              onCheckedChange={(checked) => {
+                                setRoutineAssignments((prev) => {
+                                  const prevDays = prev[routine.id] || [];
+                                  return {
+                                    ...prev,
+                                    [routine.id]: checked
+                                      ? [...prevDays, day]
+                                      : prevDays.filter((d) => d !== day),
+                                  };
+                                });
+                              }}
+                            />
+                            <Label htmlFor={`routine-${routine.id}-day-${day}`}>{day.slice(0, 3)}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </ScrollArea>
             </div>
           </div>
         </CardContent>
