@@ -130,13 +130,15 @@ export function CalendarView() {
       return events;
     };
 
-    const getPhaseForDate = (date: Date) => {
-      return phases.find((phase) =>
-        isWithinInterval(date, { 
-          start: new Date(phase.start_date + 'T00:00:00'), 
-          end: new Date(phase.end_date + 'T00:00:00') 
-        })
-      );
+    const getPhasesForDate = (date: Date) => {
+      return phases
+        .filter((phase) =>
+          isWithinInterval(date, { 
+            start: new Date(phase.start_date + 'T00:00:00'), 
+            end: new Date(phase.end_date + 'T00:00:00') 
+          })
+        )
+        .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()); // Sort by start date for priority
     };
 
     const getEventTypeColor = (type: string) => {
@@ -170,12 +172,13 @@ export function CalendarView() {
           <div className="grid grid-cols-7">
             {allDays.map((day, i) => {
               const dayEvents = getEventForDate(day);
-              const phase = getPhaseForDate(day);
+              const dayPhases = getPhasesForDate(day);
               
-              // Determine if this is the first or last day of the phase for rounded corners
-              const isFirstDay = phase ? isSameDay(day, new Date(phase.start_date + 'T00:00:00')) : false;
-              const isLastDay = phase ? isSameDay(day, new Date(phase.end_date + 'T00:00:00')) : false;
-
+              // Calculate the total height needed for phase bars
+              const phaseBarHeight = 16; // 4 * 4px (h-4)
+              const phaseBarSpacing = 2; // 2px spacing between bars
+              const totalPhaseHeight = dayPhases.length > 0 ? (dayPhases.length * phaseBarHeight) + ((dayPhases.length - 1) * phaseBarSpacing) : 0;
+              
               return (
                 <div
                   key={i}
@@ -189,32 +192,43 @@ export function CalendarView() {
                 >
                   <div className="text-right p-1 text-xs">{format(day, "d")}</div>
                   
-                  {/* Phase Bar */}
-                  {phase && (
-                    <div 
-                      className={cn(
-                        "absolute top-6 left-0 right-0 h-4 text-white text-xs font-medium flex items-center px-1",
-                        phase.color || "bg-blue-500",
-                        isFirstDay && "rounded-l-sm",
-                        isLastDay && "rounded-r-sm",
-                        !isFirstDay && "ml-0",
-                        !isLastDay && "mr-0"
-                      )}
-                      style={{
-                        // Ensure the bar extends to the edges for seamless connection
-                        marginLeft: isFirstDay ? 0 : -1,
-                        marginRight: isLastDay ? 0 : -1,
-                        zIndex: 10
-                      }}
-                    >
-                      {/* Only show phase name on the first day to avoid repetition */}
-                      {isFirstDay && (
-                        <span className="truncate">{phase.name}</span>
-                      )}
-                    </div>
-                  )}
+                  {/* Phase Bars - Stacked vertically */}
+                  {dayPhases.map((phase, phaseIndex) => {
+                    // Determine if this is the first or last day of the phase for rounded corners
+                    const isFirstDay = isSameDay(day, new Date(phase.start_date + 'T00:00:00'));
+                    const isLastDay = isSameDay(day, new Date(phase.end_date + 'T00:00:00'));
+                    
+                    // Calculate vertical position for stacking
+                    const topOffset = 6 + (phaseIndex * (phaseBarHeight + phaseBarSpacing));
+                    
+                    return (
+                      <div 
+                        key={phase.id}
+                        className={cn(
+                          "absolute left-0 right-0 h-4 text-white text-xs font-medium flex items-center px-1",
+                          phase.color || "bg-blue-500",
+                          isFirstDay && "rounded-l-sm",
+                          isLastDay && "rounded-r-sm",
+                          !isFirstDay && "ml-0",
+                          !isLastDay && "mr-0"
+                        )}
+                        style={{
+                          top: topOffset,
+                          // Ensure the bar extends to the edges for seamless connection
+                          marginLeft: isFirstDay ? 0 : -1,
+                          marginRight: isLastDay ? 0 : -1,
+                          zIndex: 10 + phaseIndex // Higher z-index for earlier phases
+                        }}
+                      >
+                        {/* Only show phase name on the first day to avoid repetition */}
+                        {isFirstDay && (
+                          <span className="truncate">{phase.name}</span>
+                        )}
+                      </div>
+                    );
+                  })}
                   
-                  <div className="space-y-1 mt-12">
+                  <div className="space-y-1" style={{ marginTop: `${Math.max(12, totalPhaseHeight + 8)}px` }}>
                     {dayEvents.slice(0, 2).map((event, idx) => (
                       <div
                         key={idx}
