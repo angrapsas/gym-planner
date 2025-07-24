@@ -54,11 +54,6 @@ export function AppSidebar() {
       icon: Goal,
       href: "/goals",
     },
-    {
-      title: "Analytics",
-      icon: BarChart3,
-      href: "/analytics",
-    },
   ]
 
   return (
