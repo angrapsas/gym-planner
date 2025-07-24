@@ -68,28 +68,10 @@ export function RoutineBuilder() {
   const [newRoutineName, setNewRoutineName] = useState("");
   const [newSkillName, setNewSkillName] = useState("");
   const [newRoutineDate, setNewRoutineDate] = useState("");
-  const [autoScheduleDays, setAutoScheduleDays] = useState<{ [key: string]: string[] }>({});
   const [loading, setLoading] = useState(false);
 
 
-  const daysOfWeek = [
-    { id: "monday", label: "Monday" },
-    { id: "tuesday", label: "Tuesday" },
-    { id: "wednesday", label: "Wednesday" },
-    { id: "thursday", label: "Thursday" },
-    { id: "friday", label: "Friday" },
-    { id: "saturday", label: "Saturday" },
-    { id: "sunday", label: "Sunday" },
-  ]
 
-  const toggleScheduledDay = (routineId: string, day: string) => {
-    setAutoScheduleDays((prev) => ({
-      ...prev,
-      [routineId]: prev[routineId]?.includes(day)
-        ? prev[routineId].filter((d) => d !== day)
-        : [...(prev[routineId] || []), day],
-    }))
-  }
 
   const getReadinessColor = (readiness: string) => {
     switch (readiness) {
@@ -290,35 +272,6 @@ export function RoutineBuilder() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>{currentRoutine?.name || "Select a Routine"}</CardTitle>
-                {currentRoutine && (
-                  <Card className="p-4 mb-4">
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Auto-Schedule Settings</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        {daysOfWeek.map((day) => (
-                          <div key={day.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`${currentRoutine.id}-${day.id}`}
-                              checked={autoScheduleDays[currentRoutine.id]?.includes(day.id) || false}
-                              onCheckedChange={() => toggleScheduledDay(currentRoutine.id, day.id)}
-                            />
-                            <Label htmlFor={`${currentRoutine.id}-${day.id}`} className="text-sm">
-                              {day.label.slice(0, 3)}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                      {autoScheduleDays[currentRoutine.id]?.length > 0 && (
-                        <div className="text-sm text-muted-foreground">
-                          This routine will automatically appear on:{" "}
-                          {autoScheduleDays[currentRoutine.id]
-                            .map((day) => daysOfWeek.find((d) => d.id === day)?.label)
-                            .join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                )}
                 <CardDescription>Drag and drop to reorder skills</CardDescription>
               </div>
               {currentRoutine && (
