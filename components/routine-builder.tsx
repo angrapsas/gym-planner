@@ -69,6 +69,8 @@ export function RoutineBuilder() {
   const [newSkillName, setNewSkillName] = useState("");
   const [newRoutineDate, setNewRoutineDate] = useState("");
   const [autoScheduleDays, setAutoScheduleDays] = useState<{ [key: string]: string[] }>({});
+  const [loading, setLoading] = useState(false);
+
 
   const daysOfWeek = [
     { id: "monday", label: "Monday" },
@@ -158,6 +160,17 @@ export function RoutineBuilder() {
     }
   }
 
+  async function removeRoutine(id: string) {
+    setLoading(true);
+    const { error } = await supabase.from("routines").delete().eq("id", id);
+    if (error) {
+      console.error(error);
+    } else {
+      setRoutines((prev) => prev.filter((r) => r.id !== id));
+    }
+    setLoading(false);
+  }
+
   const addNewSkill = async () => {
     if (!newSkillName.trim()) return
 
@@ -232,19 +245,20 @@ export function RoutineBuilder() {
             <ScrollArea className="h-[400px]">
               <div className="space-y-2">
                 {routines.map((routine) => (
-                  <div
-                    key={routine.id}
-                    className={`flex items-center justify-between p-2 rounded-md cursor-pointer ${
-                      activeRoutine === routine.id ? "bg-muted" : "hover:bg-muted/50"
-                    }`}
-                    onClick={() => setActiveRoutine(routine.id)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      {routine.isTarget && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                      <span>{routine.name}</span>
-                    </div>
-                    <Badge variant="outline">{routine.skills?.length ?? 0} skills</Badge>
-                  </div>
+                  <Card key={routine.id} className={`cursor-pointer ${activeRoutine === routine.id ? "bg-muted" : "hover:bg-muted/50"}`}>
+                    <CardHeader className="flex flex-row items-center justify-between p-2">
+                      <div className="flex items-center space-x-2" onClick={() => setActiveRoutine(routine.id)}>
+                        {routine.isTarget && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+                        <span>{routine.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">{routine.skills?.length ?? 0} skills</Badge>
+                        <Button variant="ghost" size="icon" onClick={() => removeRoutine(routine.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                  </Card>
                 ))}
               </div>
             </ScrollArea>
